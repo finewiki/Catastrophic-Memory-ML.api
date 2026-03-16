@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    /* Base Options */
+    "target": "ESNext",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ESNext", "DOM"],
+
+    /* Custom Structural Output */
+    "rootDir": "src",
+    "outDir": ".cognition",
+    
+    /* Strict Type-Checking */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    
+    /* Interoperability & Optimization */
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    
+    /* Debugging */
+    "sourceMap": true,
+    "removeComments": false,
+
+    /* Workaround for missing local node modules on this machine */
+    "types": ["node"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", ".cognition", "tests", "**/*.spec.ts"]
+}
