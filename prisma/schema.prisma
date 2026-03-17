@@ -1,0 +1,137 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("SUPABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
+}
+
+// ============================================================================
+// DEVELOPER & USAGE (Multi-Tenancy)
+// ============================================================================
+
+model Developer {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  secretKey String?  @unique // API key for authentication
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  thoughts      Thought[]
+  concepts      Concept[]
+  edges         SemanticEdge[]
+
+  @@index([email])
+  @@index([secretKey])
+}
+
+
+
+// ============================================================================
+// COGNITIVE CORE (Graph + Vector Storage)
+// ============================================================================
+
+model Thought {
+  id          String @id @default(uuid())
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  // Content
+  rawInput       String
+  processedInput String?
+  contextTags    Json?
+
+  // Embeddings & Search
+  semanticVector   Unsupported("vector(768)")? // Vector representation
+  keywordIndex     Unsupported("tsvector")? // Full-text search index
+
+  // Scoring
+  significance   Float   @default(0.5)
+  reliability    Float   @default(1.0) 
+
+  // Lifecycle
+  createdAt      DateTime @default(now())
+  lastReadAt     DateTime @default(now())
+  isArchived     Boolean  @default(false)
+  isMapped       Boolean  @default(false) // Has this been processed into Concepts?
+
+  // Relations
+  originConceptId String? // If this Thought was generated from a Concept
+  originConcept   Concept? @relation("ThoughtOrigin", fields: [originConceptId], references: [id], onDelete: SetNull)
+
+  @@index([developerId, createdAt])
+  @@index([developerId, significance])
+  @@index([developerId, isArchived])
+  @@index([isMapped])
+}
+
+model Concept {
+  id          String @id @default(uuid())
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  // Identity
+  label       String // e.g., "AI", "Server", "Jakob"
+  category    String // e.g., "PERSON", "TECHNOLOGY", "IDEA"
+  summary     String? // Auto-generated summary of the concept
+
+  // Embeddings
+  semanticVector Unsupported("vector(768)")?
+
+  // Scoring
+  centrality   Float   @default(0.5) // Graph centrality
+  certainty    Float   @default(1.0) // Confidence in existence
+
+  // Lifecycle
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  lastReadAt     DateTime @default(now())
+  isArchived     Boolean  @default(false)
+
+  // Relations
+  originThoughts Thought[]       @relation("ThoughtOrigin")
+  outboundLinks  SemanticEdge[]  @relation("SourceConcept")
+  inboundLinks   SemanticEdge[]  @relation("TargetConcept")
+
+  @@unique([developerId, label, category]) // Prevent duplicate concepts per developer
+  @@index([developerId, category])
+  @@index([developerId, centrality])
+  @@index([developerId, isArchived])
+}
+
+model SemanticEdge {
+  id          String @id @default(uuid())
+  developerId String
+  developer   Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  // Graph Connection
+  sourceId String
+  source   Concept @relation("SourceConcept", fields: [sourceId], references: [id], onDelete: Cascade)
+  
+  targetId String
+  target   Concept @relation("TargetConcept", fields: [targetId], references: [id], onDelete: Cascade)
+
+  // Connection Type
+  connectionType String // e.g., "RELATES_TO", "CREATES", "USES"
+  
+  // Optional details
+  details    Json?
+  certainty  Float   @default(1.0) // How certain are we about this connection
+  strength   Float   @default(1.0) // Connection weight
+
+  // Lifecycle
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isArchived Boolean  @default(false)
+
+  @@unique([developerId, sourceId, targetId, connectionType]) // Prevent duplicate edges
+  @@index([developerId, sourceId])
+  @@index([developerId, targetId])
+  @@index([developerId, connectionType])
+  @@index([developerId, isArchived])
+}
